@@ -1,5 +1,17 @@
 #![no_std]
 
+use soroban_sdk::{contract, contractimpl, Address, BytesN, Env};
+
+mod storage;
+mod types;
+
+#[cfg(test)]
+mod test;
+
+use storage::{get_and_increment_project_id, load_project, save_project};
+pub use types::{Project, ProjectStatus};
+#[cfg(test)]
+mod test;
 use soroban_sdk::{contract, contractimpl, symbol_short, Address, BytesN, Env};
 
 mod storage;
@@ -81,6 +93,29 @@ impl PifpProtocol {
     /// Panics if the project does not exist.
     pub fn get_project(env: Env, id: u64) -> Project {
         load_project(&env, id)
+    }
+
+    /// Deposit funds into a project.
+    pub fn deposit(env: Env, project_id: BytesN<32>, donator: Address, amount: i128) {
+        donator.require_auth();
+
+        let mut project = Self::get_project(env.clone(), project_id.clone())
+            .unwrap_or_else(|| panic_with_error!(&env, Error::ProjectNotFound));
+
+        // Transfer tokens from donator to contract
+        let token_client = token::Client::new(&env, &project.token);
+        token_client.transfer(&donator, &env.current_contract_address(), &amount);
+
+        project.balance += amount;
+        env.storage()
+            .persistent()
+            .set(&DataKey::Project(project_id.clone()), &project);
+
+        // Emit donation event
+        env.events().publish(
+            (Symbol::new(&env, "donation_received"), project_id),
+            (donator, amount),
+        );
     }
 
     /// Set the trusted oracle/verifier address.
