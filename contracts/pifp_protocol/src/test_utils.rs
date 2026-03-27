@@ -1,7 +1,7 @@
 extern crate std;
 
 use soroban_sdk::{
-    testutils::{Address as _, Ledger, LedgerInfo},
+    testutils::{Address as _, Ledger},
     token, Address, BytesN, Env, Vec,
 };
 
@@ -20,17 +20,11 @@ impl TestContext {
         let env = Env::default();
         env.mock_all_auths();
 
-        // Initialize ledger with a standard timestamp
-        env.ledger().set(LedgerInfo {
-            timestamp: 100_000,
-            protocol_version: 22,
-            sequence_number: 100,
-            network_id: [0u8; 32],
-            base_reserve: 10,
-            min_temp_entry_ttl: 10,
-            min_persistent_entry_ttl: 10,
-            max_entry_ttl: 1000,
-        });
+        // Initialize ledger while preserving host's default protocol version
+        let mut ledger = env.ledger().get();
+        ledger.timestamp = 100_000;
+        ledger.sequence_number = 100;
+        env.ledger().set(ledger);
 
         let contract_id = env.register(PifpProtocol, ());
         let client = PifpProtocolClient::new(&env, &contract_id);

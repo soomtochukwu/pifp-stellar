@@ -301,9 +301,13 @@ pub fn maybe_load_project(env: &Env, id: u64) -> Option<Project> {
 /// Retrieve the balance of `token` for `project_id`.
 pub fn get_token_balance(env: &Env, project_id: u64, token: &Address) -> i128 {
     let key = DataKey::TokenBalance(project_id, token.clone());
-    let balance = env.storage().persistent().get(&key).unwrap_or(0);
-    bump_persistent(env, &key);
-    balance
+    match env.storage().persistent().get::<DataKey, i128>(&key) {
+        Some(balance) => {
+            bump_persistent(env, &key);
+            balance
+        }
+        None => 0,
+    }
 }
 
 /// Set the balance of `token` for `project_id`.
@@ -358,11 +362,13 @@ pub fn get_all_balances(env: &Env, project: &Project) -> ProjectBalances {
 /// Retrieve a donator's contributed balance for (project_id, token).
 pub fn get_donator_balance(env: &Env, project_id: u64, token: &Address, donator: &Address) -> i128 {
     let key = DataKey::DonatorBalance(project_id, token.clone(), donator.clone());
-    let balance_opt: Option<i128> = env.storage().persistent().get(&key);
-    if balance_opt.is_some() {
-        bump_persistent(env, &key);
+    match env.storage().persistent().get::<DataKey, i128>(&key) {
+        Some(balance) => {
+            bump_persistent(env, &key);
+            balance
+        }
+        None => 0,
     }
-    balance_opt.unwrap_or(0)
 }
 
 /// Set a donator's contributed balance for (project_id, token).

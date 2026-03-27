@@ -1,6 +1,6 @@
 extern crate std;
 
-use crate::{test_utils::TestContext, ProjectStatus, Role};
+use crate::test_utils::TestContext;
 use soroban_sdk::{BytesN, Vec};
 
 // ─────────────────────────────────────────────────────────

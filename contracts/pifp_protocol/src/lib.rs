@@ -41,6 +41,7 @@ mod fuzz_test;
 mod invariants;
 #[cfg(test)]
 mod rbac_test;
+
 #[cfg(test)]
 mod test;
 #[cfg(test)]
@@ -289,8 +290,6 @@ impl PifpProtocol {
         }
         if !found {
             panic_with_error!(&env, Error::TokenNotAccepted);
-        if !config.accepted_tokens.contains(&token) {
-            panic_with_error!(&env, Error::NotAuthorized);
         }
 
         // Check if this is a new unique (donator, token) pair.

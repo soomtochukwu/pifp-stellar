@@ -1,7 +1,7 @@
 extern crate std;
 
 use soroban_sdk::{
-    testutils::{Address as _, Ledger, LedgerInfo},
+    testutils::{Address as _, Ledger},
     token, Address, BytesN, Env,
 };
 
@@ -10,16 +10,9 @@ use crate::{PifpProtocol, PifpProtocolClient, ProjectStatus, Role};
 fn setup() -> (Env, PifpProtocolClient<'static>) {
     let env = Env::default();
     env.mock_all_auths();
-    env.ledger().set(LedgerInfo {
-        timestamp: 100_000,
-        protocol_version: 22,
-        sequence_number: 100,
-        network_id: [0u8; 32],
-        base_reserve: 10,
-        min_temp_entry_ttl: 10,
-        min_persistent_entry_ttl: 10,
-        max_entry_ttl: 1000,
-    });
+    let mut ledger = env.ledger().get();
+    ledger.timestamp = 100_000;
+    env.ledger().set(ledger);
     let contract_id = env.register(PifpProtocol, ());
     let client = PifpProtocolClient::new(&env, &contract_id);
     (env, client)
@@ -59,16 +52,10 @@ fn test_refund_success_after_expiry() {
     token_sac.mint(&donator, &1_000i128);
     client.deposit(&project.id, &donator, &token.address, &400i128);
 
-    env.ledger().set(LedgerInfo {
-        timestamp: deadline + 1,
-        protocol_version: 22,
-        sequence_number: 101,
-        network_id: [0u8; 32],
-        base_reserve: 10,
-        min_temp_entry_ttl: 10,
-        min_persistent_entry_ttl: 10,
-        max_entry_ttl: 1000,
-    });
+    let mut ledger = env.ledger().get();
+    ledger.timestamp = deadline + 1;
+    ledger.sequence_number = 101;
+    env.ledger().set(ledger);
 
     client.refund(&donator, &project.id, &token.address);
 
@@ -131,16 +118,10 @@ fn test_refund_double_refund_fails() {
     token_sac.mint(&donator, &1_000i128);
     client.deposit(&project.id, &donator, &token.address, &400i128);
 
-    env.ledger().set(LedgerInfo {
-        timestamp: deadline + 1,
-        protocol_version: 22,
-        sequence_number: 101,
-        network_id: [0u8; 32],
-        base_reserve: 10,
-        min_temp_entry_ttl: 10,
-        min_persistent_entry_ttl: 10,
-        max_entry_ttl: 1000,
-    });
+    let mut ledger = env.ledger().get();
+    ledger.timestamp = deadline + 1;
+    ledger.sequence_number = 101;
+    env.ledger().set(ledger);
 
     client.refund(&donator, &project.id, &token.address);
     client.refund(&donator, &project.id, &token.address);
@@ -166,16 +147,10 @@ fn test_refund_wrong_donator_fails() {
     token_sac.mint(&donator, &1_000i128);
     client.deposit(&project.id, &donator, &token.address, &400i128);
 
-    env.ledger().set(LedgerInfo {
-        timestamp: deadline + 1,
-        protocol_version: 22,
-        sequence_number: 101,
-        network_id: [0u8; 32],
-        base_reserve: 10,
-        min_temp_entry_ttl: 10,
-        min_persistent_entry_ttl: 10,
-        max_entry_ttl: 1000,
-    });
+    let mut ledger = env.ledger().get();
+    ledger.timestamp = deadline + 1;
+    ledger.sequence_number = 101;
+    env.ledger().set(ledger);
 
     client.refund(&attacker, &project.id, &token.address);
 }
