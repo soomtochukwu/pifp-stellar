@@ -88,6 +88,7 @@ pub struct PifpEvent {
     pub timestamp: i64,
     pub contract_id: String,
     pub tx_hash: Option<String>,
+    pub extra_data: Option<String>,
 }
 
 /// A raw event record as stored in / read from the database.
@@ -102,5 +103,6 @@ pub struct EventRecord {
     pub timestamp: i64,
     pub contract_id: String,
     pub tx_hash: Option<String>,
+    pub extra_data: Option<String>,
     pub created_at: i64,
 }

@@ -84,7 +84,8 @@ async fn main() -> anyhow::Result<()> {
     let app = Router::new()
         .route("/health", get(api::health))
         .route("/events", get(api::get_all_events))
-        .route("/projects/:id/events", get(api::get_project_events))
+        .route("/projects", get(api::get_projects))
+        .route("/projects/:id/history", get(api::get_project_history_paged))
         .route("/projects/top", get(api::get_top_projects))
         .route(
             "/projects/active/count",

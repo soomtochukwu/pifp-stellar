@@ -196,14 +196,14 @@ fn decode_single(raw: &RawEvent, contract_id: &str) -> Option<PifpEvent> {
         .unwrap_or(0);
 
     let project_id = raw.topic.get(1).map(|t| extract_u64_or_raw(t));
-
-    let (actor, amount) = decode_data(&raw.value, &kind);
+    let (actor, amount, extra_data) = decode_data(&raw.value, &kind);
 
     Some(PifpEvent {
         event_type: kind.as_str().to_string(),
         project_id,
         actor,
         amount,
+        extra_data,
         ledger,
         timestamp,
         contract_id: raw
@@ -216,7 +216,10 @@ fn decode_single(raw: &RawEvent, contract_id: &str) -> Option<PifpEvent> {
 
 /// Pull apart the JSON `value` blob that Soroban returns for event data.
 /// The XDR is decoded by the RPC into a `{"type":…, …}` JSON object.
-fn decode_data(value: &Value, kind: &EventKind) -> (Option<String>, Option<String>) {
+fn decode_data(
+    value: &Value,
+    kind: &EventKind,
+) -> (Option<String>, Option<String>, Option<String>) {
     match kind {
         EventKind::ProjectCreated => {
             let actor = value
@@ -230,25 +233,28 @@ fn decode_data(value: &Value, kind: &EventKind) -> (Option<String>, Option<Strin
                     .map(String::from)
                     .or_else(|| v.as_i64().map(|n| n.to_string()))
             });
-            (actor, amount)
+            let extra = value.get("token").and_then(value_to_string);
+            (actor, amount, extra)
         }
         EventKind::ProjectFunded => {
             let actor = extract_field(value, &["donator", "funder", "address"]);
             let amount = extract_field(value, &["amount"]);
-            (actor, amount)
+            (actor, amount, None)
         }
-        EventKind::ProjectActive | EventKind::ProjectExpired => (None, None),
+        EventKind::ProjectActive | EventKind::ProjectExpired => (None, None, None),
         EventKind::ProjectCancelled => {
             let actor = extract_field(value, &["cancelled_by", "address"]);
-            (actor, None)
+            (actor, None, None)
         }
         EventKind::ProjectVerified => {
             let actor = extract_field(value, &["oracle", "verifier", "address"]);
-            (actor, None)
+            let extra = extract_field(value, &["proof_hash", "hash", "data"]);
+            (actor, None, extra)
         }
         EventKind::FundsReleased => {
             let amount = extract_field(value, &["amount"]);
-            (None, amount)
+            let token = extract_field(value, &["token"]);
+            (None, amount, token)
         }
         EventKind::DonatorRefunded => {
             let actor = extract_field(value, &["donator", "address"]).or_else(|| {
@@ -263,24 +269,23 @@ fn decode_data(value: &Value, kind: &EventKind) -> (Option<String>, Option<Strin
                     .and_then(|arr| arr.get(1))
                     .and_then(value_to_string)
             });
-            (actor, amount)
+            (actor, amount, None)
         }
         EventKind::RoleSet | EventKind::RoleDel => {
-            // For role events the "data" is typically the caller address
             let actor = value
                 .as_str()
                 .map(String::from)
                 .or_else(|| extract_field(value, &["address", "caller", "by"]));
-            (actor, None)
+            (actor, None, None)
         }
         EventKind::ProtocolPaused | EventKind::ProtocolUnpaused => {
             let actor = value
                 .as_str()
                 .map(String::from)
                 .or_else(|| extract_field(value, &["address"]));
-            (actor, None)
+            (actor, None, None)
         }
-        EventKind::Unknown => (None, None),
+        EventKind::Unknown => (None, None, None),
     }
 }
 
