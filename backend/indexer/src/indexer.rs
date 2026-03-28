@@ -22,20 +22,36 @@ pub struct IndexerState {
 
 /// Spawn the indexer loop as a background [`tokio`] task.
 pub async fn run(state: Arc<IndexerState>) {
-    info!("Indexer starting — contract: {}", state.config.contract_id);
+    info!(
+        "Indexer starting — contracts: {}",
+        state.config.contract_ids.join(",")
+    );
 
     // Load the cursor from the DB; fall back to config start_ledger.
     let last_ledger = db::get_last_ledger(&state.pool).await.unwrap_or(0);
     let cursor_str = db::get_cursor_string(&state.pool).await.unwrap_or(None);
 
-    let mut current_ledger = if last_ledger > 0 {
+    let persisted_ledger = if last_ledger > 0 {
         last_ledger as u32
     } else {
         state.config.start_ledger
     };
-    let mut cursor: Option<String> = cursor_str;
 
-    info!("Resuming from ledger {current_ledger}");
+    let mut current_ledger = state
+        .config
+        .backfill_start_ledger
+        .unwrap_or(persisted_ledger);
+    let mut cursor: Option<String> =
+        if state.config.backfill_start_ledger.is_some() || state.config.backfill_cursor.is_some() {
+            state.config.backfill_cursor.clone()
+        } else {
+            cursor_str
+        };
+
+    info!(
+        "Resuming from ledger {current_ledger} (cursor={})",
+        cursor.as_deref().unwrap_or("none")
+    );
 
     loop {
         match poll_once(
@@ -75,7 +91,7 @@ async fn poll_once(
     let (raw_events, next_cursor, latest_ledger) = rpc::fetch_events(
         client,
         &config.rpc_url,
-        &config.contract_id,
+        &config.contract_ids,
         start_ledger,
         cursor,
         config.events_per_page,
@@ -83,10 +99,10 @@ async fn poll_once(
     .await?;
 
     if !raw_events.is_empty() {
-        let decoded = rpc::decode_events(&raw_events, &config.contract_id);
+        let decoded = rpc::decode_events(&raw_events, &config.contract_ids);
         let inserted = db::insert_events(pool, &decoded).await?;
         info!(
-            "Polled {} raw events → {} new records stored",
+            "Polled {} raw events → {} decoded PIFP events stored",
             raw_events.len(),
             inserted
         );

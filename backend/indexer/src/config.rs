@@ -6,8 +6,8 @@ use crate::errors::{IndexerError, Result};
 pub struct Config {
     /// Soroban/Horizon RPC endpoint (e.g. https://soroban-testnet.stellar.org)
     pub rpc_url: String,
-    /// The PIFP contract address (Strkey format)
-    pub contract_id: String,
+    /// PIFP contract addresses (Strkey format). Supports multi-deployment indexing.
+    pub contract_ids: Vec<String>,
     /// Path to the SQLite database file
     pub database_url: String,
     /// Port for the REST API server
@@ -18,6 +18,10 @@ pub struct Config {
     pub events_per_page: u32,
     /// Ledger to start from if no cursor is saved
     pub start_ledger: u32,
+    /// Optional explicit backfill starting ledger (overrides persisted cursor start).
+    pub backfill_start_ledger: Option<u32>,
+    /// Optional explicit backfill cursor (if provided, used as initial RPC cursor).
+    pub backfill_cursor: Option<String>,
     /// Optional Redis endpoint used for API response caching
     pub redis_url: Option<String>,
     /// TTL for top projects cache entries (seconds)
@@ -28,12 +32,11 @@ pub struct Config {
 
 impl Config {
     pub fn from_env() -> Result<Self> {
+        let contract_ids = parse_contract_ids()?;
         Ok(Config {
             rpc_url: env_var("RPC_URL")
                 .unwrap_or_else(|_| "https://soroban-testnet.stellar.org".to_string()),
-            contract_id: env_var("CONTRACT_ID").map_err(|_| {
-                IndexerError::Config("CONTRACT_ID environment variable is required".to_string())
-            })?,
+            contract_ids,
             database_url: env_var("DATABASE_URL")
                 .unwrap_or_else(|_| "sqlite:./pifp_events.db".to_string()),
             api_port: env_var("API_PORT")
@@ -52,6 +55,18 @@ impl Config {
                 .unwrap_or_else(|_| "0".to_string())
                 .parse()
                 .map_err(|_| IndexerError::Config("Invalid START_LEDGER".to_string()))?,
+            backfill_start_ledger: std::env::var("BACKFILL_START_LEDGER")
+                .ok()
+                .filter(|v| !v.trim().is_empty())
+                .map(|v| {
+                    v.parse::<u32>().map_err(|_| {
+                        IndexerError::Config("Invalid BACKFILL_START_LEDGER".to_string())
+                    })
+                })
+                .transpose()?,
+            backfill_cursor: std::env::var("BACKFILL_CURSOR")
+                .ok()
+                .filter(|v| !v.trim().is_empty()),
             redis_url: std::env::var("REDIS_URL")
                 .ok()
                 .filter(|v| !v.trim().is_empty()),
@@ -73,4 +88,25 @@ impl Config {
 
 fn env_var(key: &str) -> Result<String> {
     std::env::var(key).map_err(|_| IndexerError::Config(format!("Missing env var: {key}")))
+}
+
+fn parse_contract_ids() -> Result<Vec<String>> {
+    if let Ok(ids) = std::env::var("CONTRACT_IDS") {
+        let parsed: Vec<String> = ids
+            .split(',')
+            .map(str::trim)
+            .filter(|v| !v.is_empty())
+            .map(ToString::to_string)
+            .collect();
+        if !parsed.is_empty() {
+            return Ok(parsed);
+        }
+    }
+
+    let single = env_var("CONTRACT_ID").map_err(|_| {
+        IndexerError::Config(
+            "Set CONTRACT_ID (single) or CONTRACT_IDS (comma-separated)".to_string(),
+        )
+    })?;
+    Ok(vec![single])
 }

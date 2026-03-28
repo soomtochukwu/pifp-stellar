@@ -15,6 +15,8 @@ Ensure you have Rust and Cargo installed, along with SQLite.
    Create a `.env` file in this directory with at minimum your deployed contract ID:
    ```env
    CONTRACT_ID=<YOUR_STRKEY_CONTRACT_ADDRESS>
+   # or multi-deployment:
+   # CONTRACT_IDS=<ADDR_1>,<ADDR_2>,<ADDR_3>
    ```
 
 3. **Run the indexer & API server:**
@@ -30,13 +32,16 @@ The indexer reads configuration from environment variables. You can supply these
 
 | Variable | Description | Default Value | Required |
 |----------|-------------|---------------|----------|
-| `CONTRACT_ID` | The Strkey address of the PIFP smart contract. | *None* | **Yes** |
+| `CONTRACT_ID` | Single PIFP contract address (legacy compatibility if `CONTRACT_IDS` is unset). | *None* | Conditionally |
+| `CONTRACT_IDS` | Comma-separated PIFP contract addresses for multi-deployment indexing. | *None* | Conditionally |
 | `RPC_URL` | Soroban/Horizon RPC endpoint. | `https://soroban-testnet.stellar.org` | No |
 | `DATABASE_URL` | Path or connection string for the SQLite database. | `sqlite:./pifp_events.db` | No |
 | `API_PORT` | Port for the Axum REST API server. | `3001` | No |
 | `POLL_INTERVAL_SECS` | How often (in seconds) to poll the RPC for events. | `5` | No |
 | `EVENTS_PER_PAGE` | Maximum number of events to fetch per RPC pagination slice. | `100` | No |
 | `START_LEDGER` | The ledger to start syncing from if no cursor is saved in the DB yet. | `0` | No |
+| `BACKFILL_START_LEDGER` | Optional explicit ledger sequence to begin backfill from (overrides persisted cursor start). | *None* | No |
+| `BACKFILL_CURSOR` | Optional explicit RPC cursor for deterministic resume/backfill from a known paging token. | *None* | No |
 | `REDIS_URL` | Optional Redis URL for API response caching. If unset, caching is disabled. | *None* | No |
 | `CACHE_TTL_TOP_PROJECTS_SECS` | TTL for cached `GET /projects/top` responses. | `30` | No |
 | `CACHE_TTL_ACTIVE_PROJECTS_COUNT_SECS` | TTL for cached `GET /projects/active/count` response. | `15` | No |
@@ -62,7 +67,7 @@ When you run the indexer, `sqlx` migrations automatically run to ensure the sche
 
 The background indexing logic lives in `src/indexer.rs` and `src/rpc.rs`.
 1. The indexer loads the last known cursor from the `indexer_cursor` table. If the database is empty, it falls back to `START_LEDGER`.
-2. A continuous, infinite loop requests `getEvents` from the configured Soroban RPC, filtering aggressively on the `CONTRACT_ID`.
+2. A continuous, infinite loop requests `getEvents` from the configured Soroban RPC using contract + topic filters (`created`, `funded`, `active`, `verified`, `expired`, `cancelled`, `released`, `refunded`, and admin topics).
 3. The raw payloads are passed to `decode_events()`, which extracts the base64 XDR payload and maps the primary operational topics (e.g., `created`, `funded`, `verified`) into the structured `EventKind` enum (`src/events.rs`).
 4. Extracted events are batch-inserted into the `events` table.
 5. `indexer_cursor` is updated to reflect the successful batch persistence.
@@ -97,8 +102,8 @@ If Redis is unavailable (startup or runtime), requests automatically fall back t
 ## 🔧 Troubleshooting
 
 - **`Indexer poll error: ...` loop:** 
-  You most likely have an invalid `CONTRACT_ID` or an inaccessible `RPC_URL`. Validate your variables.
+  You most likely have invalid `CONTRACT_ID`/`CONTRACT_IDS` values or an inaccessible `RPC_URL`. Validate your variables.
 - **Missing older events:**
-  If the indexer was started midway through the ledger lifecycle while the database cursor `last_ledger` was `0`, your `START_LEDGER` was likely too high or left as `0` meaning the `getEvents` RPC limit natively truncated older history. Update `START_LEDGER` to the exact ledger the contract was deployed on and wipe your database (`rm ./pifp_events.db`) to force a fresh sequential scan.
+  If the indexer was started midway through the ledger lifecycle while the database cursor `last_ledger` was `0`, your `START_LEDGER` was likely too high or left as `0` meaning the `getEvents` RPC limit natively truncated older history. Update `START_LEDGER` to the exact deployment ledger, or use `BACKFILL_START_LEDGER`/`BACKFILL_CURSOR` for a deterministic replay point.
 - **Database Locked Errors:**
   Normally handled gracefully by `sqlx`, but if another external tool (e.g., a DB browser) locks `pifp_events.db`, the indexer may crash or log warnings. Ensure SQLite WAL mode is unhindered or avoid long-running manual write queries.
