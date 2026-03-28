@@ -81,7 +81,7 @@ proptest! {
             &deadline,
         );
 
-        assert_all_project_invariants(&project);
+        check_all_project_invariants(&env, &project);
         assert_eq!(project.deadline, deadline);
     }
 

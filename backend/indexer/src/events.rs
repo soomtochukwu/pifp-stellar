@@ -27,6 +27,10 @@ pub enum EventKind {
     ProtocolPaused,
     /// Protocol was unpaused (`unpaused` topic).
     ProtocolUnpaused,
+    /// A project crossed its funding goal (`active` topic).
+    ProjectActive,
+    /// A project reached its deadline without being verified (`expired` topic).
+    ProjectExpired,
     /// An event from this contract that we don't recognise yet.
     Unknown,
 }
@@ -44,6 +48,8 @@ impl EventKind {
             "role_del" => Self::RoleDel,
             "paused" => Self::ProtocolPaused,
             "unpaused" => Self::ProtocolUnpaused,
+            "active" => Self::ProjectActive,
+            "expired" => Self::ProjectExpired,
             _ => Self::Unknown,
         }
     }
@@ -60,6 +66,8 @@ impl EventKind {
             Self::RoleDel => "role_del",
             Self::ProtocolPaused => "protocol_paused",
             Self::ProtocolUnpaused => "protocol_unpaused",
+            Self::ProjectActive => "project_active",
+            Self::ProjectExpired => "project_expired",
             Self::Unknown => "unknown",
         }
     }
@@ -76,6 +84,7 @@ pub struct PifpEvent {
     pub timestamp: i64,
     pub contract_id: String,
     pub tx_hash: Option<String>,
+    pub extra_data: Option<String>,
 }
 
 /// A raw event record as stored in / read from the database.
@@ -90,5 +99,6 @@ pub struct EventRecord {
     pub timestamp: i64,
     pub contract_id: String,
     pub tx_hash: Option<String>,
+    pub extra_data: Option<String>,
     pub created_at: i64,
 }

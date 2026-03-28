@@ -3,7 +3,7 @@
 use std::sync::Arc;
 
 use axum::{
-    extract::{Path, State},
+    extract::{Path, Query, State},
     http::StatusCode,
     response::IntoResponse,
     Json,
@@ -48,6 +48,26 @@ pub struct ErrorResponse {
 }
 
 #[derive(Deserialize)]
+pub struct ProjectQuery {
+    pub status: Option<String>,
+    pub creator: Option<String>,
+    pub limit: Option<i64>,
+    pub offset: Option<i64>,
+}
+
+#[derive(Deserialize)]
+pub struct HistoryQuery {
+    pub limit: Option<i64>,
+    pub offset: Option<i64>,
+}
+
+#[derive(Serialize)]
+pub struct ProjectsResponse {
+    pub count: usize,
+    pub projects: Vec<db::ProjectRecord>,
+}
+
+#[derive(Deserialize)]
 pub struct VoteRequest {
     pub oracle: String,
     pub proof_hash: String,
@@ -76,14 +96,18 @@ pub async fn health() -> impl IntoResponse {
     })
 }
 
-/// `GET /projects/:id/events`
+/// `GET /projects/:id/history`
 ///
-/// Returns all indexed events for the given project identifier.
-pub async fn get_project_events(
+/// Returns project event history with pagination.
+pub async fn get_project_history_paged(
     State(state): State<Arc<ApiState>>,
     Path(project_id): Path<String>,
+    Query(query): Query<HistoryQuery>,
 ) -> impl IntoResponse {
-    match db::get_events_for_project(&state.pool, &project_id).await {
+    let limit = query.limit.unwrap_or(20);
+    let offset = query.offset.unwrap_or(0);
+
+    match db::get_project_history(&state.pool, &project_id, limit, offset).await {
         Ok(events) => {
             let count = events.len();
             (
@@ -93,6 +117,35 @@ pub async fn get_project_events(
                     count,
                     events,
                 })),
+            )
+                .into_response()
+        }
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!(ErrorResponse {
+                error: e.to_string()
+            })),
+        )
+            .into_response(),
+    }
+}
+
+/// `GET /projects`
+///
+/// Returns all projects matching optional filters (status, creator), with pagination.
+pub async fn get_projects(
+    State(state): State<Arc<ApiState>>,
+    Query(query): Query<ProjectQuery>,
+) -> impl IntoResponse {
+    let limit = query.limit.unwrap_or(20);
+    let offset = query.offset.unwrap_or(0);
+
+    match db::list_projects(&state.pool, query.status, query.creator, limit, offset).await {
+        Ok(projects) => {
+            let count = projects.len();
+            (
+                StatusCode::OK,
+                Json(serde_json::json!(ProjectsResponse { count, projects })),
             )
                 .into_response()
         }
