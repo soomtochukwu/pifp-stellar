@@ -58,6 +58,7 @@ fn test_verify_and_release_with_fees() {
         &accepted_tokens,
         &1000,
         &proof_hash,
+        &(env.ledger().timestamp() + 10000),
         &(env.ledger().timestamp() + 10000), &false,
     );
     
@@ -99,6 +100,7 @@ fn test_verify_and_release_zero_fee() {
         &accepted_tokens,
         &1000,
         &proof_hash,
+        &(env.ledger().timestamp() + 10000),
         &(env.ledger().timestamp() + 10000), &false,
     );
     

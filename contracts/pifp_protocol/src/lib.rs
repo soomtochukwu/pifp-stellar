@@ -64,6 +64,8 @@ mod test_reclaim;
 #[cfg(test)]
 mod test_deadline;
 #[cfg(test)]
+mod test_deadline;
+#[cfg(test)]
 mod test_errors;
 #[cfg(test)]
 mod test_protocol_config;
@@ -75,6 +77,13 @@ pub use errors::Error;
 pub use events::emit_funds_released;
 pub use rbac::Role;
 use storage::{
+    drain_token_balance, get_all_balances, get_and_increment_project_id, get_protocol_config,
+    load_project, load_project_pair, maybe_load_project, save_project, save_project_config,
+    save_project_state, set_protocol_config,
+};
+pub use types::{Project, ProjectBalances, ProjectConfig, ProjectState, ProtocolConfig};
+
+
     add_to_whitelist, drain_token_balance, get_all_balances, get_and_increment_project_id,
     get_protocol_config, is_whitelisted, load_project, load_project_pair, maybe_load_project,
     remove_from_whitelist, save_project, save_project_config, save_project_state,

@@ -23,6 +23,7 @@ fn test_extend_deadline_success() {
         &accepted_tokens,
         &1000,
         &[0u8; 32].into(),
+        &deadline,
         &deadline, &false,
     );
     
@@ -51,6 +52,7 @@ fn test_extend_deadline_by_admin() {
         &accepted_tokens,
         &1000,
         &[0u8; 32].into(),
+        &deadline,
         &deadline, &false,
     );
     
@@ -78,6 +80,7 @@ fn test_extend_deadline_unauthorized() {
         &accepted_tokens,
         &1000,
         &[0u8; 32].into(),
+        &(env.ledger().timestamp() + 10000),
         &(env.ledger().timestamp() + 10000), &false,
     );
     
@@ -100,6 +103,7 @@ fn test_extend_deadline_backwards() {
         &accepted_tokens,
         &1000,
         &[0u8; 32].into(),
+        &deadline,
         &deadline, &false,
     );
     
@@ -126,6 +130,7 @@ fn test_extend_deadline_expired() {
         &accepted_tokens,
         &1000,
         &[0u8; 32].into(),
+        &deadline,
         &deadline, &false,
     );
     
@@ -154,6 +159,7 @@ fn test_extend_deadline_too_long() {
         &accepted_tokens,
         &1000,
         &[0u8; 32].into(),
+        &deadline,
         &deadline, &false,
     );
     
